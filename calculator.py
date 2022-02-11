@@ -43,31 +43,19 @@ def calc_v0(time_step, grid, starting_dsd, environment):
         height_idx = moisture_calculations.nearest_ind(grid['grid_mids'],
                                                        iheight)  # np.where(grid_tops == iheight)[0][0]
 
-        # Find supersaturation, Fk, and Fd at height
-        supersat = (environment['e'][height_idx] / environment['esi'][height_idx]) - 1
-        Fk = moisture_calculations.FkCalc(environment['temp_C'][height_idx], iceFlag=True)  # [m s kg-1]
-        Fd = moisture_calculations.FdCalc(environment['temp_C'][height_idx], environment['esi'][height_idx])  # [m s kg-1]
-
         # Calculate fall speed
         fall_speed_ms = starting_dsd['fall_speed'] # m/s
         fall_speed_ms_corrected = model_calculations.fallspeedCorrection(fall_speed_ms,
                                                                       environment['air_density'][height_idx])
 
         # Calculate sublimation mass flux
-        capacitance = 2 * ((idiameter_mm / 2) * 1e-3) / np.pi # disk 2r/pi sphere c=r
-        sublimation_flux = (4 * np.pi * capacitance * supersat) / (Fk + Fd)  # dm/dt [kg s-1]
+        sublimation_flux = sublimationFlux(environment, idiameter_mm/2)
 
         # Calculate riming mass flux
-        A_m = np.pi * (((idiameter_mm / 2) + (environment['scwater']['d_mm'][height_idx] / 2)) * 1e-3) ** 2
-        riming_flux = A_m * abs(fall_speed_ms_corrected - 0) * environment['scwater']['coll_eff'] * \
-                      (environment['scwater']['n'][height_idx] * moisture_calculations.dropVolume(
-                          environment['scwater']['d_mm'][height_idx] * 1e-3) * constants.rhoI) / (
-                              grid['spacing'] * 1000 ** 2)
-
-        #print(str(riming_flux))
+        riming_flux = rimingFlux(environment, idiameter_mm/2, fall_speed_ms_corrected, grid)
 
         # update particle
-        total_flux = (sublimation_flux + riming_flux) * time_step
+        total_flux = (sublimation_flux + riming_flux) * time_step # [kg/s] * [s] = [kg]
         new_dropmass_kg = idropmass_kg + total_flux  # [kg]
         if new_dropmass_kg <= 0:
             print("Drop mass <= 0; exiting loop")
@@ -138,7 +126,7 @@ def sublimationFlux(env, drop_radius_mm):
 
     return sublimation_flux
 
-def rimingFlux(env, drop_radius_mm, fall_speed_ms_corrected):
+def rimingFlux(env, drop_radius_mm, fall_speed_ms_corrected, grid):
 
     A_m = np.pi * ((drop_radius_mm + (env['scwater']['d_mm'] / 2)) * 1e-3) ** 2
     riming_flux = A_m * abs(fall_speed_ms_corrected - 0) * env['scwater']['coll_eff'] * \
@@ -146,8 +134,11 @@ def rimingFlux(env, drop_radius_mm, fall_speed_ms_corrected):
                       env['scwater']['d_mm'] * 1e-3) * constants.rhoI) / (
                           grid['spacing'] * 1000 ** 2)
 
+    return riming_flux
 
 def createGrid(top=10000, bottom=0, spacing=1000):
+
+    # All values in meters
 
     grid_tops, grid_bots, grid_mids = model_calculations.model_grid(bottom, top, spacing) # m
 
