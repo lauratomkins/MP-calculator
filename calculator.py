@@ -2,6 +2,7 @@ import numpy as np
 import moisture_calculations
 import model_calculations
 import constants
+from metpy.units import units
 
 
 def calc_v0(time_step, grid, starting_dsd, environment):
@@ -114,25 +115,47 @@ def calc_v0(time_step, grid, starting_dsd, environment):
 
     return output
 
-def sublimationFlux(env, drop_radius_mm):
+def sublimationFlux(env, drop_radius_mm, type='disk'):
+
+    # input array, output array
+    # input value, output value
 
     supersat = (env['e'] / env['esi']) - 1
     Fk = moisture_calculations.FkCalc(env['temp_C'], iceFlag=True)  # [m s kg-1]
-    Fd = moisture_calculations.FdCalc(env['temp_C'], env['esi'], env['p_kpa'])  # [m s kg-1]
+    Fd = moisture_calculations.FdCalc(env['temp_C'], env['esi'], p_kpa=env['p_kpa'])  # [m s kg-1]
+
+    drop_radius_m = drop_radius_mm / 1e3
 
     # Calculate sublimation mass flux
-    capacitance = 2 * (drop_radius_mm) / np.pi  # disk 2r/pi sphere c=r [m]
+    if type in ('disk'):
+        capacitance = 2 * (drop_radius_m) / np.pi  # disk 2r/pi sphere c=r [m]
+    elif type in ('sphere'):
+        capacitance = drop_radius_m
+
     sublimation_flux = (4 * np.pi * capacitance * supersat) / (Fk + Fd) # [kg/s]
 
     return sublimation_flux
 
-def rimingFlux(env, drop_radius_mm, fall_speed_ms_corrected, grid):
+def rimingFlux(env, drop_radius_mm, fall_speed_ms_corrected, grid, johnson_flag=False):
 
-    A_m = np.pi * ((drop_radius_mm + (env['scwater']['d_mm'] / 2)) * 1e-3) ** 2
-    riming_flux = A_m * abs(fall_speed_ms_corrected - 0) * env['scwater']['coll_eff'] * \
-                  (env['scwater']['n'] * moisture_calculations.dropVolume(
-                      env['scwater']['d_mm'] * 1e-3) * constants.rhoI) / (
-                          grid['spacing'] * 1000 ** 2)
+    if johnson_flag:
+        rho_w = 1.0 # [g cm-3]
+        r = 1
+        drop_diameter_cm = (drop_radius_mm * 2)/10
+        drop_mass_g = (np.pi * rho_w / 6) * drop_diameter_cm**3
+        A_cm = (np.pi/4) * (6 * drop_mass_g / (np.pi * r * env['rho_i'])) ** (2/3) # [cm2]
+        A_m = A_cm / (100**2)
+    else:
+        A_m = np.pi * ((drop_radius_mm + (env['scwater_d_mm'] / 2)) * 1e-3) ** 2 # cross sectional area [m2]
+
+    if 'lwc' in env.keys():
+        lwc = env['lwc'] # [g m3]
+    else:
+        lwc = (env['scwater_n'] * moisture_calculations.dropVolume(env['scwater_d_mm'] * 1e-3) * constants.rhoW) \
+              / (grid['spacing'] * 1000 ** 2) # ndrops * mass of 1 drop / grid volume [g / m3]
+
+    riming_flux = A_m * abs(fall_speed_ms_corrected - 0) * env['coll_eff'] * lwc
+
 
     return riming_flux
 
@@ -199,10 +222,10 @@ def createEnv(grid, tempLims=[0,-30], constantRHi=100, sc_layers=False, isclayer
         'e': e,
         'es': es,
         'esi': esi,
-        'scwater': {
-            'n': n_scwater,
-            'd_mm': d_scwater_mm,
-            'coll_eff': collection_efficiency},
-        'air_density': rho_mids}
+        'scwater_n': n_scwater,
+        'scwater_d_mm': d_scwater_mm,
+        'coll_eff': collection_efficiency,
+        'air_density': rho_mids,
+        'height': grid_mids}
 
     return environment
