@@ -10,47 +10,51 @@ import matplotlib.pyplot as plt
 temp_C = -15 # deg C
 RHw = 100
 p_kpa = 80
-imass_g = 1e-8
+initmass_g = 1e-8
 dewp_C = moist_calc.dewFromRH(temp_C, RHw) # deg C
 esi = moist_calc.esiFromTemp(temp_C)  # sat. vapor pressure wrt ice
 e = moist_calc.eswFromTemp(dewp_C)  # vapor pressure
 shape = 'disk'
-relat = 'Mitchell1990'
+relat = 'RY1989'
+initradius_m = md_calc.mass2radius(initmass_g, relat)
 
 env = {'temp_C': temp_C,
        'e': e,
        'esi': esi,
        'p_kpa': p_kpa}
 
-drop_mass_kg = []
-drop_radius_mm = []
+#%% Grow drop
+drop_mass_g = []
+drop_radius_m = []
 sub_flux = []
 
-iradius_cm = md_calc.mass2radius(imass_g, relat)
-iradius_mm = iradius_cm * 10
-imass_kg = imass_g / 1e3 # kg
-
-time_step = 100 # seconds
+time_step = 10 # seconds
 time = np.arange(0, 1e4+time_step, time_step) # seconds
+
+imass_g = initmass_g
+iradius_m = initradius_m
 
 for itime in time:
 
-       drop_mass_kg.append(imass_kg)
-       drop_radius_mm.append(iradius_mm)
+       # store drop information
+       drop_mass_g.append(imass_g)
+       drop_radius_m.append(iradius_m)
 
-       iradius_cm = md_calc.mass2radius(imass_g, relat)
-       iradius_mm = iradius_cm * 10
+       # calculate radius
+       iradius_m = md_calc.mass2radius(imass_g, relat)
 
-       iflux = calculator.sublimationFlux(env, iradius_mm) # kg/s
+       # calculate sublimation flux
+       iflux_kg = calculator.sublimationFlux(env, iradius_m) # kg/s
+       iflux_g = iflux_kg * 10e3
+       sub_flux.append(iflux_g)
 
-       sub_flux.append(iflux)
-       imass_kg = imass_kg + (iflux * time_step)
-       imass_g = imass_kg * 1e3
+       # update drop mass
+       imass_g = imass_g + (iflux_g * time_step)
 
 
 #%% plot
 
-drop_mass_ug = np.array(drop_mass_kg) * 1e9
+drop_mass_ug = np.array(drop_mass_g) * 1e6
 
 fig = plt.figure(figsize=(6,6))
 ax1 = plt.gca()
@@ -60,8 +64,8 @@ ax1.set_xlabel('Mass [micrograms]')
 ax1.set_ylabel('Time [seconds]')
 ax1.set_yscale('log')
 ax1.set_xscale('log')
-ax1.set_ylim([1e0, 1e4])
-ax1.set_xlim([1e-2, 1e2])
+ax1.set_ylim([1e1, 1e4])
+ax1.set_xlim([1e-2, 2e2])
 ax1.grid()
 #ax1.set_title('Riming sensitivity', loc='right')
 ax1.legend()
