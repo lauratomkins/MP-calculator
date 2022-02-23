@@ -4,19 +4,26 @@ import model_calculations
 import constants
 import numpy as np
 import matplotlib.pyplot as plt
+from metpy.units import units
 
 #%% environment:
-temp_C = -8 # deg C
-RHw = 100
-p_kpa = 100
+temp_C = -10.0 # deg C
+RHw = 100.0
+p_kpa = 60.0
 dewp_C = moisture_calculations.dewFromRH(temp_C, RHw) # deg C
 esi = moisture_calculations.esiFromTemp(temp_C)  # sat. vapor pressure wrt ice
 e = moisture_calculations.eswFromTemp(dewp_C)  # vapor pressure
-n_scwater = 3.64e19
-d_scwater_um = 20
-d_scwater_mm = 20/1e3
+lwc = 1.0 # g m-3
+rho_i = 0.9 # [g cm -3]
+rho_w = 1.0 # [g cm -3]
 
-updraft = 5 # m/s
+drop_diameter_mm = np.array([0.5, 1, 2])
+drop_diameter_cm = drop_diameter_mm / 10
+drop_mass_g = (np.pi * rho_w / 6) * drop_diameter_cm**3
+fallspeed_cms = np.array([233, 450, 771])
+fallspeed_ms = fallspeed_cms/100
+d_scwater_um = np.array([20,12])
+eff = np.array([[0.96, 0.93, 0.91],[0.79, 0.79, 0.76]])
 
 grid = {'spacing': 1000}
 
@@ -24,11 +31,16 @@ env = {'temp_C': temp_C,
        'e': e,
        'esi': esi,
        'p_kpa': p_kpa,
-       'scwater': {
-              'n': n_scwater,
-              'd_mm': d_scwater_mm,
-              'coll_eff': 1}
+       'rho_i': rho_i,
+       'lwc': lwc
        }
+
+res = np.empty_like(eff)
+for idrop, diameter in np.ndenumerate(drop_diameter_mm):
+       fall_speed = fallspeed_ms[idrop]
+       for icloud, c_diameter in np.ndenumerate(d_scwater_um):
+              env['coll_eff'] = eff[icloud, idrop]
+              res[icloud, idrop] = calculator.rimingFlux(env, diameter/2, fall_speed, grid, johnson_flag=True)
 
 #%%
 
