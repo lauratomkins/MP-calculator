@@ -2,6 +2,8 @@ import numpy as np
 
 def mass2radius(mass_g, flag):
 
+    # input weight in grams, output diameter in meters
+
     if flag in ('RY1989', 'Rogers', 'Yau'):
         radius_cm = (mass_g / 3.8e-3)**(1/2)  # mass in g to radius in cm (Rogers and Yau - disk)
     elif flag in ('Yang2000'):
@@ -12,4 +14,7 @@ def mass2radius(mass_g, flag):
         radius_cm = radius_mm / 10
     else:
         raise KeyError
-    return radius_cm
+
+    radius_m = radius_cm * 10e-2
+
+    return radius_m
