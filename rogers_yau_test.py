@@ -1,5 +1,6 @@
 import calculator
-import moisture_calculations
+import moisture_calculations as moist_calc
+import mass_diameter_calculations as md_calc
 import model_calculations
 import constants
 import numpy as np
@@ -9,9 +10,12 @@ import matplotlib.pyplot as plt
 temp_C = -15 # deg C
 RHw = 100
 p_kpa = 80
-dewp_C = moisture_calculations.dewFromRH(temp_C, RHw) # deg C
-esi = moisture_calculations.esiFromTemp(temp_C)  # sat. vapor pressure wrt ice
-e = moisture_calculations.eswFromTemp(dewp_C)  # vapor pressure
+imass_g = 1e-8
+dewp_C = moist_calc.dewFromRH(temp_C, RHw) # deg C
+esi = moist_calc.esiFromTemp(temp_C)  # sat. vapor pressure wrt ice
+e = moist_calc.eswFromTemp(dewp_C)  # vapor pressure
+shape = 'disk'
+relat = 'Mitchell1990'
 
 env = {'temp_C': temp_C,
        'e': e,
@@ -20,16 +24,13 @@ env = {'temp_C': temp_C,
 
 drop_mass_kg = []
 drop_radius_mm = []
+sub_flux = []
 
-imass_g = 1e-8
+iradius_cm = md_calc.mass2radius(imass_g, relat)
+iradius_mm = iradius_cm * 10
 imass_kg = imass_g / 1e3 # kg
-imass_mg = imass_g * 1e3
-iradius_cm = np.sqrt(imass_g / 3.8e-3) # mass in g to radius in cm (Rogers and Yau - disk)
-#iradius_cm = 0.5 * (imass_g/(8.3e-3))**(1/2.449) # Yang (2000) hexagonal plate
-iradius_mm = iradius_cm * 10 # cm to mm
-#iradius_mm = 0.5 * (imass_mg/(0.028))**(1/2.5) # Mitchell et al. (1990) hexagonal plate
 
-time_step = 1 # seconds
+time_step = 100 # seconds
 time = np.arange(0, 1e4+time_step, time_step) # seconds
 
 for itime in time:
@@ -37,14 +38,14 @@ for itime in time:
        drop_mass_kg.append(imass_kg)
        drop_radius_mm.append(iradius_mm)
 
-       iradius_cm = np.sqrt(imass_g / 3.8e-3) # Houghton (1985) disk via Rogers and Yau
-       #iradius_cm = 0.5 * (imass_g / (8.3e-3)) ** (1 / 2.449) # Yang (2000) hexagonal plate
+       iradius_cm = md_calc.mass2radius(imass_g, relat)
        iradius_mm = iradius_cm * 10
-       #iradius_mm = 0.5 * (imass_mg / (0.028)) ** (1 / 2.5) # Mitchell et al. (1990) hexagonal plate
+
        iflux = calculator.sublimationFlux(env, iradius_mm) # kg/s
+
+       sub_flux.append(iflux)
        imass_kg = imass_kg + (iflux * time_step)
        imass_g = imass_kg * 1e3
-       imass_mg = imass_g * 1e3
 
 
 #%% plot
@@ -53,7 +54,7 @@ drop_mass_ug = np.array(drop_mass_kg) * 1e9
 
 fig = plt.figure(figsize=(6,6))
 ax1 = plt.gca()
-ax1.plot(drop_mass_ug * 1e-1, time, label='RH$_{ice}$ = 116% \n RH$_{water}$ = 100%', linewidth=3)
+ax1.plot(drop_mass_ug, time, label='RH$_{ice}$ = 116% \n RH$_{water}$ = 100%', linewidth=3)
 
 ax1.set_xlabel('Mass [micrograms]')
 ax1.set_ylabel('Time [seconds]')
