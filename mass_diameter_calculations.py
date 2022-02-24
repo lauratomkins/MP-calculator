@@ -15,6 +15,6 @@ def mass2radius(mass_g, flag):
     else:
         raise KeyError
 
-    radius_m = radius_cm * 10e-2
+    radius_m = radius_cm * 1e-2
 
     return radius_m
