@@ -235,18 +235,38 @@ def RHi_from_T_Td(temp_C, dewpoint_C):
 
 
 def FkCalc(temp_C, iceFlag=False):
+    """
+    Function to calculate Fk given a certain temperatures
+    :param temp_C: temperature in degC
+    :param iceFlag: True if dealing with ice
+    :return: Fk
+    """
+    # convert temperature to K
     temp_K = temp_C + 273.15
+
+    # get correct latent heat constant
     L = constants.Lv
     if iceFlag:
         L = constants.Ls
 
+    # calculate Fk
     Fk = (L ** 2) / (constants.thermalCond(temp_K) * constants.Rv * (temp_K ** 2))
 
     return Fk
 
 
 def FdCalc(temp_C, es, p_kpa=100):
+    """
+    Function to calculate Fd given a certain temperature and vapor pressure
+    :param temp_C: temperature in degC
+    :param es: saturation vapor pressure
+    :param p_kpa: environmental pressure in kpa
+    :return: Fd
+    """
+    # convert temperature to K
     temp_K = temp_C + 273.15
+
+    # calculate Fd
     Fd = (constants.Rv * temp_K) / (constants.diffCoeff(temp_K, p_kpa) * es)
 
     return Fd
