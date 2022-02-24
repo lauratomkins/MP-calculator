@@ -28,7 +28,7 @@ drop_mass_g = []
 drop_radius_m = []
 sub_flux = []
 
-time_step = 10 # seconds
+time_step = 1 # seconds
 time = np.arange(0, 1e4+time_step, time_step) # seconds
 
 imass_g = initmass_g
@@ -45,7 +45,7 @@ for itime in time:
 
        # calculate sublimation flux
        iflux_kg = calculator.sublimationFlux(env, iradius_m) # kg/s
-       iflux_g = iflux_kg * 10e3
+       iflux_g = iflux_kg * 1e3
        sub_flux.append(iflux_g)
 
        # update drop mass
