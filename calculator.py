@@ -134,11 +134,13 @@ def sublimationFlux(env, drop_radius_m, type='disk'):
 
     return sublimation_flux
 
-def rimingFlux(env, drop_radius_mm, fall_speed_ms_corrected, grid, johnson_flag=False):
+def rimingFlux(env, drop_radius_m, fall_speed_ms_corrected, grid=None, johnson_flag=False):
+
+    drop_radius_mm = drop_radius_m * 1e3
 
     if johnson_flag:
         rho_w = 1.0 # [g cm-3]
-        r = 1
+        r = 1 # axis ratio
         drop_diameter_cm = (drop_radius_mm * 2)/10
         drop_mass_g = (np.pi * rho_w / 6) * drop_diameter_cm**3
         A_cm = (np.pi/4) * (6 * drop_mass_g / (np.pi * r * env['rho_i'])) ** (2/3) # [cm2]
