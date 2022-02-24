@@ -116,13 +116,19 @@ def calc_v0(time_step, grid, starting_dsd, environment):
     return output
 
 def sublimationFlux(env, drop_radius_m, type='disk'):
+    """
 
+    :param env:
+    :param drop_radius_m:
+    :param type:
+    :return:
+    """
     # input array, output array
     # input value, output value
 
     supersat = (env['e'] / env['esi']) - 1
     Fk = moisture_calculations.FkCalc(env['temp_C'], iceFlag=True)  # [m s kg-1]
-    Fd = moisture_calculations.FdCalc(env['temp_C'], env['esi'], p_kpa=env['p_kpa'])  # [m s kg-1]
+    Fd = moisture_calculations.FdCalc(env['temp_C'], 100*env['esi'], p_kpa=env['p_kpa'])  # [m s kg-1]
 
     # Calculate sublimation mass flux
     if type in ('disk'):
