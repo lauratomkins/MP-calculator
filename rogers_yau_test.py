@@ -1,3 +1,7 @@
+"""
+Recreate Figure 9.8 in Rogers and Yau (1989) textbook
+"""
+
 import calculator
 import moisture_calculations as moist_calc
 import mass_diameter_calculations as md_calc
@@ -58,13 +62,17 @@ drop_mass_ug = np.array(drop_mass_g) * 1e6
 
 fig = plt.figure(figsize=(6,6))
 ax1 = plt.gca()
+#ax2 = ax1.twinx()
 ax1.plot(drop_mass_ug, time, label='RH$_{ice}$ = 116% \n RH$_{water}$ = 100%', linewidth=3)
+#ax2.plot(np.array(sub_flux)/np.array(drop_mass_g), linewidth=3, linestyle='--')
 
 ax1.set_xlabel('Mass [micrograms]')
 ax1.set_ylabel('Time [seconds]')
 ax1.set_yscale('log')
 ax1.set_xscale('log')
+#ax2.set_yscale('log')
 ax1.set_ylim([1e1, 1e4])
+#ax2.set_ylim([1e-4, 1e-1])
 ax1.set_xlim([1e-2, 2e2])
 ax1.grid()
 #ax1.set_title('Riming sensitivity', loc='right')

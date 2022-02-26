@@ -1,3 +1,7 @@
+"""
+Test of calculations in Johnson (1987)
+"""
+
 import calculator
 import moisture_calculations
 import model_calculations

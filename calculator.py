@@ -136,6 +136,7 @@ def sublimationFlux(env, drop_radius_m, type='disk'):
     elif type in ('sphere'):
         capacitance = drop_radius_m
 
+    # Houze (2003) textbook Ch. 3 and Rogers and Yau (1989)
     sublimation_flux = (4 * np.pi * capacitance * supersat) / (Fk + Fd) # [kg/s]
 
     return sublimation_flux
@@ -160,6 +161,7 @@ def rimingFlux(env, drop_radius_m, fall_speed_ms_corrected, grid=None, johnson_f
         lwc = (env['scwater_n'] * moisture_calculations.dropVolume(env['scwater_d_mm'] * 1e-3) * constants.rhoW) \
               / (grid['spacing'] * 1000 ** 2) # ndrops * mass of 1 drop / grid volume [g / m3]
 
+    # Johnson (1987) and Houze (2003) textbook Ch. 3
     riming_flux = A_m * abs(fall_speed_ms_corrected - 0) * env['coll_eff'] * lwc # [g/s]
 
 
