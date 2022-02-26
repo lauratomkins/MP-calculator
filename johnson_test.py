@@ -40,7 +40,7 @@ for idrop, diameter in np.ndenumerate(drop_diameter_mm):
        fall_speed = fallspeed_ms[idrop]
        for icloud, c_diameter in np.ndenumerate(d_scwater_um):
               env['coll_eff'] = eff[icloud, idrop]
-              res[icloud, idrop] = calculator.rimingFlux(env, diameter/2, fall_speed, grid, johnson_flag=True)
+              res[icloud, idrop] = calculator.rimingFlux(env, diameter/2, fall_speed, grid, johnson_flag=True) # g/s
 
 #%%
 
