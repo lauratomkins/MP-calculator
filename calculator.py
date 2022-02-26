@@ -150,7 +150,7 @@ def rimingFlux(env, drop_radius_m, fall_speed_ms_corrected, grid=None, johnson_f
         drop_diameter_cm = (drop_radius_mm * 2)/10
         drop_mass_g = (np.pi * rho_w / 6) * drop_diameter_cm**3
         A_cm = (np.pi/4) * (6 * drop_mass_g / (np.pi * r * env['rho_i'])) ** (2/3) # [cm2]
-        A_m = A_cm / (100**2)
+        A_m = A_cm / (100**2) # [m2]
     else:
         A_m = np.pi * ((drop_radius_mm + (env['scwater_d_mm'] / 2)) * 1e-3) ** 2 # cross sectional area [m2]
 
@@ -160,7 +160,7 @@ def rimingFlux(env, drop_radius_m, fall_speed_ms_corrected, grid=None, johnson_f
         lwc = (env['scwater_n'] * moisture_calculations.dropVolume(env['scwater_d_mm'] * 1e-3) * constants.rhoW) \
               / (grid['spacing'] * 1000 ** 2) # ndrops * mass of 1 drop / grid volume [g / m3]
 
-    riming_flux = A_m * abs(fall_speed_ms_corrected - 0) * env['coll_eff'] * lwc
+    riming_flux = A_m * abs(fall_speed_ms_corrected - 0) * env['coll_eff'] * lwc # [g/s]
 
 
     return riming_flux
