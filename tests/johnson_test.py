@@ -4,31 +4,46 @@ Test of calculations in Johnson (1987)
 
 import calculator
 import moisture_calculations
-import model_calculations
 import constants
 import numpy as np
 import matplotlib.pyplot as plt
-from metpy.units import units
 
 #%% environment:
-temp_C = -10.0 # deg C
+# temperature [deg C]
+temp_C = -10.0
+# relative humidity wrt water
 RHw = 100.0
+# air pressure in kPa
 p_kpa = 60.0
-dewp_C = moisture_calculations.dewFromRH(temp_C, RHw) # deg C
-esi = moisture_calculations.esiFromTemp(temp_C)  # sat. vapor pressure wrt ice
-e = moisture_calculations.eswFromTemp(dewp_C)  # vapor pressure
-lwc = 1.0 # g m-3
-rho_i = 0.9 # [g cm -3]
-rho_w = 1.0 # [g cm -3]
+# dewpoint [deg C]
+dewp_C = moisture_calculations.dewFromRH(temp_C, RHw)
+# sat. vapor pressure wrt ice
+esi = moisture_calculations.esiFromTemp(temp_C)
+# vapor pressure
+e = moisture_calculations.eswFromTemp(dewp_C)
+# liquid water content  [g m-3]
+lwc = 1.0
+# density of ice [g cm -3]
+rho_i = 0.9
+# density of water [g cm -3]
+rho_w = 1.0
 
+# drop diameters
 drop_diameter_mm = np.array([0.5, 1, 2])
 drop_diameter_cm = drop_diameter_mm / 10
+# drop mass
 drop_mass_g = (np.pi * rho_w / 6) * drop_diameter_cm**3
+
+# fall speeds
 fallspeed_cms = np.array([233, 450, 771])
 fallspeed_ms = fallspeed_cms/100
+
+# super-cooled water
 d_scwater_um = np.array([20,12])
+# collection efficiency
 eff = np.array([[0.96, 0.93, 0.91],[0.79, 0.79, 0.76]])
 
+# grid size
 grid = {'spacing': 1000}
 
 env = {'temp_C': temp_C,
@@ -51,8 +66,7 @@ for idrop, diameter in np.ndenumerate(drop_diameter_mm):
 drop_mass_kg = []
 drop_radius_mm = []
 
-iradius_um = 500 # sphere
-iradius_mm = iradius_um/1e3
+iradius_um = 500 # sphereiradius_mm = iradius_um/1e3
 iradius_cm = iradius_mm / 10
 
 imass_kg = moisture_calculations.dropVolume(iradius_cm*2/100)*constants.rhoI # [kg]

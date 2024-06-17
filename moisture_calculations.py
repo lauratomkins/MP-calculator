@@ -1,3 +1,6 @@
+"""
+Moisture calculation functions
+"""
 import numpy as np
 import constants
 

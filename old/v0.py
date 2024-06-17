@@ -1,3 +1,6 @@
+"""
+Early versions of the calculator
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FixedLocator

@@ -1,5 +1,7 @@
+"""
+Functions to create a model grid and correct fall speed
+"""
 import numpy as np
-#import moisture_calculations
 
 def model_grid(bottom, top, spacing):
 

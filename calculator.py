@@ -2,10 +2,171 @@ import numpy as np
 import moisture_calculations
 import model_calculations
 import constants
-from metpy.units import units
 
+def sublimationFlux(env, drop_radius_m, type='disk'):
+    """
+    A function that calculates mass flux due to sublimation/vapor deposition
+
+    :param env: dictionary of environment
+    :param drop_radius_m: radius of drop
+    :param type: shape of drop (disk or sphere)
+    :return: sublimation flux [kg/s]
+    """
+
+    # calculate necessary parameters from environment
+    supersat = (env['e'] / env['esi']) - 1
+    Fk = moisture_calculations.FkCalc(env['temp_C'], iceFlag=True)  # [m s kg-1]
+    Fd = moisture_calculations.FdCalc(env['temp_C'], 100*env['esi'], p_kpa=env['p_kpa'])  # [m s kg-1]
+
+    # Calculate sublimation mass flux
+    if type in ('disk'):
+        capacitance = 2 * (drop_radius_m) / np.pi  # disk 2r/pi sphere c=r [m]
+    elif type in ('sphere'):
+        capacitance = drop_radius_m
+
+    # Houze (2003) textbook Ch. 3 and Rogers and Yau (1989)
+    sublimation_flux = (4 * np.pi * capacitance * supersat) / (Fk + Fd) # [kg/s]
+
+    return sublimation_flux
+
+def rimingFlux(env, drop_radius_m, fall_speed_ms_corrected, grid=None, johnson_flag=False):
+    """
+    A function that calculates mass flux from riming
+
+    :param env: dictionary of environment
+    :param drop_radius_m: radius of drop
+    :param fall_speed_ms_corrected: fall speed of drop
+    :param grid: details of grid to calculate lwc (optional)
+    :param johnson_flag: bool of if using relationship from Johnson paper (optional)
+    :return: riming flux [kg/s]
+    """
+    drop_radius_mm = drop_radius_m * 1e3
+
+    if johnson_flag:
+        rho_w = 1.0 # [g cm-3]
+        r = 1 # axis ratio
+        drop_diameter_cm = (drop_radius_mm * 2)/10
+        drop_mass_g = (np.pi * rho_w / 6) * drop_diameter_cm**3
+        A_cm = (np.pi/4) * (6 * drop_mass_g / (np.pi * r * env['rho_i'])) ** (2/3) # [cm2]
+        A_m = A_cm / (100**2) # [m2]
+    else:
+        A_m = np.pi * ((drop_radius_mm + (env['scwater_d_mm'] / 2)) * 1e-3) ** 2 # cross sectional area [m2]
+
+    if 'lwc' in env.keys():
+        lwc = env['lwc'] # [g m3]
+    else:
+        lwc = (env['scwater_n'] * moisture_calculations.dropVolume(env['scwater_d_mm'] * 1e-3) * constants.rhoW) \
+              / (grid['spacing'] * 1000 ** 2) # ndrops * mass of 1 drop / grid volume [g / m3]
+
+    # Johnson (1987) and Houze (2003) textbook Ch. 3
+    riming_flux = A_m * abs(fall_speed_ms_corrected - 0) * env['coll_eff'] * lwc # [g/s]
+
+    return riming_flux
+
+def createGrid(top=10000, bottom=0, spacing=1000):
+    """
+    An old function to create a grid
+    :param top:
+    :param bottom:
+    :param spacing:
+    :return:
+    """
+
+    # All values in meters
+
+    grid_tops, grid_bots, grid_mids = model_calculations.model_grid(bottom, top, spacing) # m
+
+    grid = {
+        'top': top,
+        'bottom': bottom,
+        'spacing': spacing,
+        'grid_tops': grid_tops,
+        'grid_mids': grid_mids,
+        'grid_bots': grid_bots}
+
+    return grid
+
+def createDSD(diameter_mm, fall_speed):
+    """
+    An old function to create a DSD
+    :param diameter_mm:
+    :param fall_speed:
+    :return:
+    """
+
+    #drop_mass_kg = ndrops * moisture_calculations.dropVolume(diameter * 1e-3) * constants.rhoI  # [kg]
+    diameter_cm = diameter_mm / 10
+    radius_cm = diameter_cm / 2
+    drop_mass_g = (3.8e-3 * (radius_cm ** 2)) # Houghton (1985) via Rogers and Yau # cm to g
+    drop_mass_kg = drop_mass_g / 1000
+
+    starting_dsd = {
+        'diameter': diameter_mm,
+        'mass': drop_mass_kg,
+        'fall_speed': fall_speed}
+
+    return starting_dsd
+
+def createEnv(grid, tempLims=[0,-30], constantRHi=100, sc_layers=False, isclayer=7, nsclayer=100, dsclayer=0.01):
+    """
+    An old function used to define an environment
+    :param grid:
+    :param tempLims:
+    :param constantRHi:
+    :param sc_layers:
+    :param isclayer:
+    :param nsclayer:
+    :param dsclayer:
+    :return:
+    """
+    grid_mids = grid['grid_mids']
+
+    # Create temperature, dewpoint, RHi profile
+    temp_C = np.linspace(tempLims[0], tempLims[1], len(grid_mids))
+    RHi = np.full(np.shape(temp_C), constantRHi)
+    dewp_C = moisture_calculations.dewFromRHi(temp_C, RHi)
+    esi = moisture_calculations.esiFromTemp(temp_C)  # sat. vapor pressure wrt ice
+    e = moisture_calculations.eswFromTemp(dewp_C)  # vapor pressure
+    es = moisture_calculations.eswFromTemp(temp_C)  # sat. vapor pressure wrt liquid
+    RHw = e / es * 100
+    rho_mids = model_calculations.ZtoAirDensity(grid_mids)  # [kg/m3]
+
+    # Defining supercooled liquid water layer for riming
+    n_scwater = np.zeros_like(RHi, dtype=float)
+    d_scwater_mm = np.zeros_like(RHi, dtype=float)
+    collection_efficiency = 0
+    if sc_layers:
+        n_cm = nsclayer  # droplets/cm3
+        n_m = n_cm * (100 ** 3) # droplets/m3
+        n_scwater[isclayer] = n_m * (grid['spacing'] ** 3)
+        d_scwater_mm[isclayer] = dsclayer  # [mm] (10 micrometers)
+        collection_efficiency = 1
+
+    environment = {
+        'temp_C': temp_C,
+        'dtemp_C': dewp_C,
+        'RHw': RHw,
+        'RHi': RHi,
+        'e': e,
+        'es': es,
+        'esi': esi,
+        'scwater_n': n_scwater,
+        'scwater_d_mm': d_scwater_mm,
+        'coll_eff': collection_efficiency,
+        'air_density': rho_mids,
+        'height': grid_mids}
+
+    return environment
 
 def calc_v0(time_step, grid, starting_dsd, environment):
+    """
+    An old function for growing drops within a grid given a specific DSD and environment
+    :param time_step:
+    :param grid:
+    :param starting_dsd:
+    :param environment:
+    :return:
+    """
     # set starting values
     iheight_m = grid['top']
     idiameter_mm = starting_dsd['diameter']
@@ -114,126 +275,3 @@ def calc_v0(time_step, grid, starting_dsd, environment):
         'iwc': col_iwc}
 
     return output
-
-def sublimationFlux(env, drop_radius_m, type='disk'):
-    """
-
-    :param env:
-    :param drop_radius_m:
-    :param type:
-    :return:
-    """
-    # input array, output array
-    # input value, output value
-
-    supersat = (env['e'] / env['esi']) - 1
-    Fk = moisture_calculations.FkCalc(env['temp_C'], iceFlag=True)  # [m s kg-1]
-    Fd = moisture_calculations.FdCalc(env['temp_C'], 100*env['esi'], p_kpa=env['p_kpa'])  # [m s kg-1]
-
-    # Calculate sublimation mass flux
-    if type in ('disk'):
-        capacitance = 2 * (drop_radius_m) / np.pi  # disk 2r/pi sphere c=r [m]
-    elif type in ('sphere'):
-        capacitance = drop_radius_m
-
-    # Houze (2003) textbook Ch. 3 and Rogers and Yau (1989)
-    sublimation_flux = (4 * np.pi * capacitance * supersat) / (Fk + Fd) # [kg/s]
-
-    return sublimation_flux
-
-def rimingFlux(env, drop_radius_m, fall_speed_ms_corrected, grid=None, johnson_flag=False):
-
-    drop_radius_mm = drop_radius_m * 1e3
-
-    if johnson_flag:
-        rho_w = 1.0 # [g cm-3]
-        r = 1 # axis ratio
-        drop_diameter_cm = (drop_radius_mm * 2)/10
-        drop_mass_g = (np.pi * rho_w / 6) * drop_diameter_cm**3
-        A_cm = (np.pi/4) * (6 * drop_mass_g / (np.pi * r * env['rho_i'])) ** (2/3) # [cm2]
-        A_m = A_cm / (100**2) # [m2]
-    else:
-        A_m = np.pi * ((drop_radius_mm + (env['scwater_d_mm'] / 2)) * 1e-3) ** 2 # cross sectional area [m2]
-
-    if 'lwc' in env.keys():
-        lwc = env['lwc'] # [g m3]
-    else:
-        lwc = (env['scwater_n'] * moisture_calculations.dropVolume(env['scwater_d_mm'] * 1e-3) * constants.rhoW) \
-              / (grid['spacing'] * 1000 ** 2) # ndrops * mass of 1 drop / grid volume [g / m3]
-
-    # Johnson (1987) and Houze (2003) textbook Ch. 3
-    riming_flux = A_m * abs(fall_speed_ms_corrected - 0) * env['coll_eff'] * lwc # [g/s]
-
-
-    return riming_flux
-
-def createGrid(top=10000, bottom=0, spacing=1000):
-
-    # All values in meters
-
-    grid_tops, grid_bots, grid_mids = model_calculations.model_grid(bottom, top, spacing) # m
-
-    grid = {
-        'top': top,
-        'bottom': bottom,
-        'spacing': spacing,
-        'grid_tops': grid_tops,
-        'grid_mids': grid_mids,
-        'grid_bots': grid_bots}
-
-    return grid
-
-def createDSD(ndrops, diameter_mm, fall_speed):
-
-    #drop_mass_kg = ndrops * moisture_calculations.dropVolume(diameter * 1e-3) * constants.rhoI  # [kg]
-    diameter_cm = diameter_mm / 10
-    radius_cm = diameter_cm / 2
-    drop_mass_g = (3.8e-3 * (radius_cm ** 2)) # Houghton (1985) via Rogers and Yau # cm to g
-    drop_mass_kg = drop_mass_g / 1000
-
-    starting_dsd = {
-        'diameter': diameter_mm,
-        'mass': drop_mass_kg,
-        'fall_speed': fall_speed}
-
-    return starting_dsd
-
-def createEnv(grid, tempLims=[0,-30], constantRHi=100, sc_layers=False, isclayer=7, nsclayer=100, dsclayer=0.01):
-    grid_mids = grid['grid_mids']
-
-    # Create temperature, dewpoint, RHi profile
-    temp_C = np.linspace(tempLims[0], tempLims[1], len(grid_mids))
-    RHi = np.full(np.shape(temp_C), constantRHi)
-    dewp_C = moisture_calculations.dewFromRHi(temp_C, RHi)
-    esi = moisture_calculations.esiFromTemp(temp_C)  # sat. vapor pressure wrt ice
-    e = moisture_calculations.eswFromTemp(dewp_C)  # vapor pressure
-    es = moisture_calculations.eswFromTemp(temp_C)  # sat. vapor pressure wrt liquid
-    RHw = e / es * 100
-    rho_mids = model_calculations.ZtoAirDensity(grid_mids)  # [kg/m3]
-
-    # Defining supercooled liquid water layer for riming
-    n_scwater = np.zeros_like(RHi, dtype=float)
-    d_scwater_mm = np.zeros_like(RHi, dtype=float)
-    collection_efficiency = 0
-    if sc_layers:
-        n_cm = nsclayer  # droplets/cm3
-        n_m = n_cm * (100 ** 3) # droplets/m3
-        n_scwater[isclayer] = n_m * (grid['spacing'] ** 3)
-        d_scwater_mm[isclayer] = dsclayer  # [mm] (10 micrometers)
-        collection_efficiency = 1
-
-    environment = {
-        'temp_C': temp_C,
-        'dtemp_C': dewp_C,
-        'RHw': RHw,
-        'RHi': RHi,
-        'e': e,
-        'es': es,
-        'esi': esi,
-        'scwater_n': n_scwater,
-        'scwater_d_mm': d_scwater_mm,
-        'coll_eff': collection_efficiency,
-        'air_density': rho_mids,
-        'height': grid_mids}
-
-    return environment

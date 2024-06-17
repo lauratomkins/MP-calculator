@@ -1,3 +1,6 @@
+"""
+constants used in calculations
+"""
 import numpy as np
 
 # Latent Heat constants (ametsoc glossary)
@@ -7,6 +10,7 @@ Ls = 2.834e6  # J/kg
 
 # Gas constant for water vapor (ametsoc glossary)
 Rv = 461.5  # J/(kgK)
+Rd = 287    # J/(kgK)
 
 # density of water (liquid and ice)
 rhoW = 999.8  # kg/m3
